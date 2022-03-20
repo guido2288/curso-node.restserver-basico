@@ -1,39 +1,63 @@
 const { response } = require('express');
+const bcryptjs = require('bcryptjs');
 
 
-const usuariosGet  = (req, res = response) => {
+const Usuario = require('../models/usuario');
 
-    const { q, nombre, apikey } = req.query;
+// Mostramos los usuarios
+const usuariosGet  = async(req, res = response) => {
+
+    const { limite = 5 , desde = 0} = req.query;
+    const query = { estado : true };
+
+    const [ total, usuarios ] = await Promise.all([
+        Usuario.countDocuments( query ),
+        Usuario.find( query )
+            .skip( Number( desde ) )
+            .limit(  Number( limite ) )
+    ])
 
     res.json({
-        msg:"Get Api -- controlador",
-        q,
-        nombre,
-        apikey
+        total,
+        usuarios
     });
 
 };
+// Creamos los usuarios
+const usuariosPost = async(req, res) => {
 
-const usuariosPost = (req, res) => {
+    const { nombre, correo , password, rol } = req.body;
+    const usuario = new Usuario( { nombre, correo, password, rol } );
 
-    const { nombre, edad } = req.body;
+    // Encriptar la pass
+    const salt = bcryptjs.genSaltSync();
+    usuario.password = bcryptjs.hashSync( password, salt );
+    
+    // Gaurdar en BD
+    await usuario.save();
 
-    res.status(201).json({
-        msg:"Post Api --controlador",
-        nombre ,
-        edad
+    res.json({
+        usuario
     });
 
 }
 
-const usuariosPut = (req, res ) => {
+const usuariosPut = async(req, res = response ) => {
 
-    const id = req.params.id;
+    const {id} = req.params;
+    const { password, google, ...resto } = req.body;
+    console.log(id)
+    console.log(resto)
+    // ToDo validar contra BD
+    if ( password ) {
 
-    res.status(400).json({
-        msg:"Put Api --controlador",
-        id
-    });
+        const salt = bcryptjs.genSaltSync();
+        resto.password = bcryptjs.hashSync( password, salt );
+    }
+
+    const  usuario = await Usuario.findOneAndUpdate( id, resto , {new: true});
+    console.log(usuario)
+    res.json(usuario);
 
 };
 
@@ -41,14 +65,23 @@ const usuariosPatch = (req, res ) => {
 
     res.json({
         msg:"Patch Api --controlador"
+        
     });
 
 };
 
-const usuariosDelete = (req, res) => {
+const usuariosDelete = async(req, res) => {
+
+    const { id } = req.params;
+
+    // Fisicamente lo borramos
+    //const usuario = await Usuario.findByIdAndDelete( id );
+
+    // Cambiando el estado del usuario
+    const usuario = await Usuario.findByIdAndUpdate( id, { estado: false } );
 
     res.json({
-        msg:"Delete Api --controlador"
+        usuario
     });
 
   }
